@@ -171,6 +171,12 @@ def serverB(start_server):
 
 
 @pytest.fixture(scope='session')
+def server_maxmemory_low(start_server):
+    """Starts redis-server instance."""
+    return start_server('maxmemory-low', config_lines=['maxmemory 4000000'])
+
+
+@pytest.fixture(scope='session')
 def sentinel(start_sentinel, request, start_server):
     """Starts redis-sentinel instance with one master -- masterA."""
     # Adding master+slave for normal (no failover) tests:

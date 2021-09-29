@@ -223,8 +223,13 @@ class RedisConnection(AbcConnection):
         waiter, encoding, cb = self._waiters.popleft()
         if isinstance(obj, RedisError):
             if isinstance(obj, ReplyError):
-                if obj.args[0].startswith('READONLY'):
+                error_code = obj.args[0].split(' ', 1)[0]
+
+                if error_code == 'READONLY':
                     obj = ReadOnlyError(obj.args[0])
+                elif error_code == 'EXECABORT':
+                    self._end_transaction(None, discard=True)
+
             _set_exception(waiter, obj)
             if self._in_transaction is not None:
                 self._transaction_error = obj

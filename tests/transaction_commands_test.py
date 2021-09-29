@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 
+import aioredis
 from aioredis import ReplyError, MultiExecError, WatchVariableError
 from aioredis import ConnectionClosedError
 
@@ -266,3 +267,26 @@ async def test_multi_exec_db_select(redis):
     await tr.execute()
     assert await f1 == 'bar'
     assert await f2 == b'bar'
+
+
+async def test_oom_inside_transaction(server_maxmemory_low):
+    conn = await aioredis.create_connection(server_maxmemory_low.tcp_address)
+
+    try:
+        await conn.execute('MULTI')
+
+        with pytest.raises(aioredis.ReplyError) as exc_info:
+            await conn.execute('SET', 'key1', b'0' * 4_000_000)
+
+        assert exc_info.value.args[0].startswith('OOM ')
+
+        with pytest.raises(aioredis.ReplyError) as exc_info:
+            await conn.execute('EXEC')
+
+        assert exc_info.value.args[0].startswith('EXECABORT ')
+
+        assert not conn.in_transaction
+
+    finally:
+        conn.close()
+        await conn.wait_closed()
